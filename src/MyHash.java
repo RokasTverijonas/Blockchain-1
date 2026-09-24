@@ -20,12 +20,12 @@ public class MyHash {
 
         hash = mixing(hash);
 
-        String hex = "";
+        StringBuilder hex = new StringBuilder();
 
         for(byte i : hash) {
-            hex += String.format("%02x", i & 0xff);
+            hex.append(String.format("%02x", i & 0xff));
         }
-        return hex;
+        return hex.toString();
     }
 
     private static byte[] mixing(byte[] hash) {
