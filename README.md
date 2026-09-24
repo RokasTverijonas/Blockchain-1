@@ -22,7 +22,7 @@ trimmed, case-changed, or otherwise normalized.
 ## Setup
 
 ```bash
-git clone <https://github.com/RokasTverijonas/Blockchain-1.git>
+git clone https://github.com/RokasTverijonas/Blockchain-1.git
 cd MyHash
 ```
 
