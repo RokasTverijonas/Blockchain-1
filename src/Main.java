@@ -8,7 +8,6 @@ import java.util.Scanner;
 public class Main {
 
     public static void main(String[] args) {
-        Scanner sc = new Scanner(System.in, StandardCharsets.UTF_8);
 
         byte[] input;
 
@@ -27,19 +26,17 @@ public class Main {
             }
         } else {
             System.out.println("Naudojamas rankinės įvesties režimas.");
-
-            String text = userInput(sc);
-            input = text.getBytes(StandardCharsets.UTF_8);
+            try {
+                input = System.in.readAllBytes();
+            } catch (IOException e) {
+                System.out.println("Nepavyko nuskaityti įvesties.");
+                return;
+            }
         }
 
         String result = MyHash.hash(input);
 
         System.out.println("Hash: " + result);
-    }
-
-    private static String userInput(Scanner sc) {
-        System.out.println("Įveskite tekstą: ");
-        return sc.nextLine();
     }
 
     private static byte[] readFile(String fileName) throws IOException {
