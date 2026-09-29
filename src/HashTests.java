@@ -9,11 +9,13 @@ public class HashTests {
     private final static int seed = 283;
 
     public static void main(String[] args) throws Exception {
-        //formatTest();
-        //determinismTest();
-        //efficiencyTest();
+        formatTest();
+        determinismTest();
+        efficiencyTest();
         collisionTest();;
         structuredCollisionTest();
+        avalancheTest();
+        SaltTest();
     }
 
     //tikrinamas reikalingas formatas
@@ -75,7 +77,7 @@ public class HashTests {
         System.out.println(a.equals(a1) ? "A sutampa, pavyko" : "A skiriasi, nepavyko");
         System.out.println("A1: " + a);
         System.out.println("B: " + b);
-        System.out.println("A2: " + a);
+        System.out.println("A2: " + a1);
 
 
     }
@@ -228,7 +230,188 @@ public class HashTests {
         System.out.println("Struktūruotų įvesčių: " + inputs.length + ", kolizijų: " + collisions);
     }
 
-    //generavimas
+    static void avalancheTest() {
+        int[] lengths = {10, 100, 500, 1000};
+        int pairsPerLength = 25000;
+        Random rand = new Random(seed);
+
+        double totalBitSum = 0;
+        double totalHexSum = 0;
+        double totalBitMin = 100;
+        double totalBitMax = 0;
+        double totalHexMin = 100;
+        double totalHexMax = 0;
+
+        System.out.println("Ilgis;MinBit%;MaxBit%;VidBit%;MinHex%;MaxHex%;VidHex%");
+
+        for (int len : lengths) {
+            double bitSum = 0;
+            double hexSum = 0;
+
+            double bitMin = 100;
+            double bitMax = 0;
+
+            double hexMin = 100;
+            double hexMax = 0;
+
+            for (int i = 0; i < pairsPerLength; i++) {
+                String text1 = randomAscii(rand, len);
+                char[] chars = text1.toCharArray();
+
+                int position = rand.nextInt(len);
+                char oldChar = chars[position];
+                char newChar = randomChar(rand);
+
+                while (oldChar == newChar) {
+                    newChar = randomChar(rand);
+                }
+                chars[position] = newChar;
+                String text2 = new String(chars);
+
+                String hashA = MyHash.hash(text1.getBytes(StandardCharsets.US_ASCII));
+                String hashB = MyHash.hash(text2.getBytes(StandardCharsets.US_ASCII));
+
+                int bitDiff = countBitDiff(hashA, hashB);
+                int hexDiff = countHexDiff(hashA, hashB);
+
+                double bitPercent = 100.0 * bitDiff / (hashA.length() * 4);
+                double hexPercent = 100.0 * hexDiff / hashA.length();
+
+                bitSum += bitPercent;
+                hexSum += hexPercent;
+                bitMin = Math.min(bitMin, bitPercent);
+                bitMax = Math.max(bitMax, bitPercent);
+                hexMin = Math.min(hexMin,hexPercent);
+                hexMax = Math.max(hexMax, hexPercent);
+
+                System.err.println(len + ";" +String.format("%.2f", bitPercent));
+
+            }
+
+            System.out.printf("%d;%.1f;%.1f;%.2f;%.1f;%.1f;%.2f%n",
+                    len, bitMin, bitMax, bitSum / pairsPerLength, hexMin, hexMax, hexSum / pairsPerLength);
+            totalBitSum += bitSum;
+            totalHexSum += hexSum;
+            totalBitMin = Math.min(totalBitMin, bitMin);
+            totalBitMax = Math.max(totalBitMax, bitMax);
+            totalHexMin = Math.min(totalHexMin, hexMin);
+            totalHexMax = Math.max(totalHexMax, hexMax);
+        }
+        int totalPairs = pairsPerLength * lengths.length;
+        System.out.printf("Visi;%.1f;%.1f;%.2f;%.1f;%.1f;%.2f%n",
+                totalBitMin, totalBitMax, totalBitSum / totalPairs,
+                totalHexMin, totalHexMax, totalHexSum / totalPairs);
+
+    }
+
+    static void SaltTest() {
+        String target = "5293";
+        String targetHash = MyHash.hash(target.getBytes(StandardCharsets.US_ASCII));
+
+        //be druskos
+        //bandymai iki pirmo sutapimo
+        int attempts = 0;
+        List<String> matches = new ArrayList<>();
+        List<Integer> when = new ArrayList<>();
+        Double firstMatchTimeMs = -1.0;
+
+        long start = System.nanoTime();
+        for (int i = 0; i < 10000; i++) {
+            String candidate = String.format("%04d", i);
+            String hash = MyHash.hash(candidate.getBytes(StandardCharsets.US_ASCII));
+            attempts++;
+            if (hash.equals(targetHash)) {
+                matches.add(candidate);
+                when.add(attempts);
+
+                if (firstMatchTimeMs == -1.0) {
+                    long matchTime = System.nanoTime();
+                    firstMatchTimeMs = (matchTime - start) /1000000.0;
+                }
+
+            }
+        }
+        long end = System.nanoTime();
+        double ms = (end - start) / 1_000_000.0;
+
+        System.out.println("Be druskos: ");
+        System.out.println("Tikslinė Įvestis: " + target);
+        System.out.println("Tikslinė maiša: " + targetHash);
+        System.out.println("Bandymai iki pirmo atitikimo: " + when.get(0)) ;
+        System.out.println("Laikas iki pirmo atitikimo: " + firstMatchTimeMs);
+        System.out.println("Bandymai: " + attempts + ", laikas: " + ms + "ms");
+        System.out.println("Sutampantys kandidatai: " + matches);
+
+        //====================SU DRUSKA===============
+        int attempts1 = 0;
+        List<String> matches1 = new ArrayList<>();
+        List<Integer> when1 = new ArrayList<>();
+
+        String salt = randomSalt();
+        String targetWithSalt = target + salt;
+        String targetHash1 = MyHash.hash(targetWithSalt.getBytes(StandardCharsets.US_ASCII));
+
+        double firstMatchTimeMs1 = -1.0;
+
+        long start1 = System.nanoTime();
+        for (int i = 0; i < 10000; i++) {
+            String candidate = String.format("%04d", i);
+            String candidateWithSalt = candidate + salt;
+            String hash = MyHash.hash(candidateWithSalt.getBytes(StandardCharsets.US_ASCII));
+            attempts1++;
+            if (hash.equals(targetHash1)) {
+                matches1.add(candidate);
+                when1.add(attempts1);
+
+                if (firstMatchTimeMs1 == -1.0) {
+                    long matchTime1 = System.nanoTime();
+                    firstMatchTimeMs1 = (matchTime1 - start1) / 1000000.0;
+                }
+            }
+
+        }
+        long end1 = System.nanoTime();
+        double ms1 = (end1 - start1) / 1_000_000.0;
+
+        System.out.println("Su druska: ");
+        System.out.println("Tikslinė Įvestis: " + target);
+        System.out.println("Druska: " + salt);
+        System.out.println("Tikslinė maiša (su druska): " + targetHash1);
+        System.out.println("Bandymai iki pirmo atitikimo: " + when1.get(0)) ;
+        System.out.println("Laikas iki pirmo atitikimo: " + firstMatchTimeMs1);
+        System.out.println("Bandymai: " + attempts1 + ", laikas: " + ms1 + "ms");
+        System.out.println("Sutampantys kandidatai: " + matches1);
+
+    }
+    /* HELPERS */
+    //grazinamas hash skirtumas bitais
+    static int countBitDiff(String hexA, String hexB) {
+        int diff = 0;
+        for (int i = 0; i < hexA.length(); i += 2) {
+            int byteA = Integer.parseInt(hexA.substring(i, i + 2), 16);
+            int byteB = Integer.parseInt(hexB.substring(i, i + 2), 16);
+            diff += Integer.bitCount(byteA ^ byteB);
+        }
+        return diff;
+    }
+
+    //grazinamas hash skirtumas hex
+    static int countHexDiff(String hexA, String hexB) {
+        int diff = 0;
+        for (int i = 0; i < hexA.length(); i++) {
+            if (hexA.charAt(i) != hexB.charAt(i)) {
+                diff++;
+            }
+        }
+        return diff;
+    }
+
+    //random char simbolio generavimas
+    static char randomChar(Random rand) {
+        return alphabet.charAt(rand.nextInt(alphabet.length()));
+    }
+
+    //Ascii eilues generavimas
     static String randomAscii(Random rand, int len) {
         StringBuilder text = new StringBuilder();
         for (int i = 0; i < len; i++) {
@@ -237,5 +420,18 @@ public class HashTests {
         }
 
         return text.toString();
+    }
+
+    //atsitiktinai generuojama druska
+    static String randomSalt() {
+        Random rand = new Random(seed);
+        StringBuilder saltBuilder = new StringBuilder();
+        for (int i = 0; i < 12; i++) {
+            saltBuilder.append(alphabet.charAt(rand.nextInt(alphabet.length())));
+        }
+
+        String salt = saltBuilder.toString();
+
+        return salt;
     }
 }
