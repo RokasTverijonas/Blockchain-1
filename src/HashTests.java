@@ -1,9 +1,7 @@
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 public class HashTests {
     //ascii simboliain skirti teksto generavimui
@@ -11,9 +9,11 @@ public class HashTests {
     private final static int seed = 283;
 
     public static void main(String[] args) throws Exception {
-        formatTest();
-        determinismTest();
-        efficiencyTest();
+        //formatTest();
+        //determinismTest();
+        //efficiencyTest();
+        collisionTest();;
+        structuredCollisionTest();
     }
 
     //tikrinamas reikalingas formatas
@@ -149,7 +149,93 @@ public class HashTests {
         System.err.println("resultSum=" + resultSum);
     }
 
+    static void collisionTest() {
+        int[] lengths = {10, 100, 500, 1000};
+        int pairs = 100000;
+        Random rand = new Random(seed);
+
+        System.out.println("Ilgis;PorosKolizijos;GrupesSuKolizija");
+
+        for (int len : lengths) {
+            int pairCollisions = 0;
+            int groupCollisions = 0;
+
+            Set<String> seenInputs = new HashSet<>();
+            Map<String, String> hashAndInput = new HashMap<>();
 
 
+
+            for (int p = 0; p < pairs; p++) {
+                String a = randomAscii(rand, len);
+                String b = randomAscii(rand, len);
+                //uztikriname, kad poros elementai nera tokie patys
+                while (b.equals(a)) {
+                    b = randomAscii(rand, len);
+                }
+
+                String  hashA = MyHash.hash(a.getBytes(StandardCharsets.US_ASCII));
+                String  hashB = MyHash.hash(b.getBytes(StandardCharsets.US_ASCII));
+
+                if (hashA.equals(hashB)) {
+                    pairCollisions++;
+                }
+
+                if (!seenInputs.contains(a)) {
+                    seenInputs.add(a);
+                    if (hashAndInput.containsKey(hashA)) {
+                        System.err.println("Kolizija | " + hashAndInput.get(hashA) + " | " + a);
+                        groupCollisions++;
+                    } else {
+                        hashAndInput.put(hashA, a);
+                    }
+                }
+
+                if (!seenInputs.contains(b)) {
+                    seenInputs.add(b);
+                    if (hashAndInput.containsKey(hashB)) {
+                        System.err.println("Kolizija | " + hashAndInput.get(hashB) + " | " + b);
+                        groupCollisions++;
+                    } else {
+                        hashAndInput.put(hashB, b);
+                    }
+                }
+
+            }
+
+            System.out.println(len + ";" + pairCollisions + ";" + groupCollisions);
+        }
+
+
+    }
+
+    static void structuredCollisionTest() {
+        String[] inputs = {"abc", "cba", "bca", "bac", "cab",
+        "bbbbbbbbbbbbbbb", "aaaaaaaa", "cccccccc", "bababa"};
+
+        Map<String, String> seen = new HashMap<>();
+        int collisions = 0;
+
+        System.out.println("Strukturuotų atvejų testas: ");
+        for (String i : inputs) {
+            String h = MyHash.hash(i.getBytes(StandardCharsets.US_ASCII));
+            String existing = seen.putIfAbsent(h, i);
+            if (existing != null) {
+                collisions++;
+                System.out.println("Kolizija: | " + existing + " ir " + i);
+            }
+        }
+
+        System.out.println("Struktūruotų įvesčių: " + inputs.length + ", kolizijų: " + collisions);
+    }
+
+    //generavimas
+    static String randomAscii(Random rand, int len) {
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < len; i++) {
+            int index = rand.nextInt(alphabet.length());
+            text.append(alphabet.charAt(index));
+        }
+
+        return text.toString();
     }
 }
