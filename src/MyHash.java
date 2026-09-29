@@ -29,14 +29,17 @@ public class MyHash {
     }
 
     private static byte[] mixing(byte[] hash) {
-        for (int i = 0; i < hash.length; i++) {
-            int next = (i + 1) % hash.length;
-            int previous = (i - 1 + hash.length) % hash.length;
+        //mano sugalvotas atnaujinimas, mixinga pakartojame tris kartus (gal but pades tes lavinos efektu)
+        for (int j = 0 ; j < 3; j++) {
+            for (int i = 0; i < hash.length; i++) {
+                int next = (i + 1) % hash.length;
+                int previous = (i - 1 + hash.length) % hash.length;
 
-            hash[i] ^= hash[next];
-            hash[i] ^= hash[previous];
-            hash[i] *= 51;
+                hash[i] ^= hash[next];
+                hash[i] ^= hash[previous];
+                hash[i] *= 51;
 
+            }
         }
         return hash;
     }
