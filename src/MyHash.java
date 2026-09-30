@@ -1,46 +1,45 @@
 public class MyHash {
+    // initial state constants (8 words = 256 bits)
+    private static final int[] INIT = {
+            0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+            0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+    };
+    // odd multiplier
+    private static final int MUL = 0x9E3779B1;
+    // number of final mixing rounds
+    private static final int ROUNDS = 16;
+
     public static String hash(byte[] input) {
-        byte[] hash = new byte[32];
+        int[] s = INIT.clone();
 
-        int seed = 293847597;
-
-        for(int i = 0; i < hash.length; i++) {
-            seed = seed * 28 + i;
-
-            hash[i] = (byte) seed;
+        // absorb input
+        for (int i = 0; i < input.length; i++) {
+            int idx = i & 7;
+            s[idx] ^= (input[i] & 0xff);
+            s[idx] = Integer.rotateLeft(s[idx] * MUL, 13);
+            s[(idx + 1) & 7] += s[idx];
         }
 
-        for(int i = 0; i < input.length; i++) {
-            int index = i % 32;
+        // add input length
+        s[0] ^= input.length;
+        s[1] += input.length * MUL;
 
-            hash[index] ^= input[i];
-
-            hash[index] *= 51;
-        }
-
-        hash = mixing(hash);
-
-        StringBuilder hex = new StringBuilder();
-
-        for(byte i : hash) {
-            hex.append(String.format("%02x", i & 0xff));
-        }
-        return hex.toString();
-    }
-
-    private static byte[] mixing(byte[] hash) {
-        //mano sugalvotas atnaujinimas, mixinga pakartojame tris kartus (gal but pades tes lavinos efektu)
-        for (int j = 0 ; j < 3; j++) {
-            for (int i = 0; i < hash.length; i++) {
-                int next = (i + 1) % hash.length;
-                int previous = (i - 1 + hash.length) % hash.length;
-
-                hash[i] ^= hash[next];
-                hash[i] ^= hash[previous];
-                hash[i] *= 51;
-
+        // final mixing
+        for (int r = 0; r < ROUNDS; r++) {
+            for (int i = 0; i < 8; i++) {
+                int a = s[i];
+                int b = s[(i + 1) & 7];
+                int c = s[(i + 5) & 7];
+                a += Integer.rotateLeft(b, 7) ^ c;
+                a *= MUL;
+                a ^= a >>> 15;
+                s[i] = a;
             }
         }
-        return hash;
+
+        // convert to hex
+        StringBuilder hex = new StringBuilder();
+        for (int w : s) hex.append(String.format("%08x", w));
+        return hex.toString();
     }
 }

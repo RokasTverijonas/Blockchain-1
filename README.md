@@ -1,44 +1,44 @@
-# Custom Hash Function
+# V0.2 Version
 
-A custom hash function built from scratch in Java.
+A custom hash function built from scratch in Java with AI-assitance.
+
+> **v0.2 is the AI-assisted version** (made with Claude, by Anthropic). The original version is v0.1.1. Both were tested with the same tests).
 
 ## The idea and pseudocode
 
-The hash function produces a fixed-size **32-byte (256-bit)** hash, represented as a 64-character hexadecimal string.
+The hash is **256 bits**, shown as a 64-character hex string. The internal state is **eight 32-bit words**.
 
-The algorithm works in the following stages:
-
-1. A 32-byte internal state is initialized using a fixed seed.
-2. Each input byte is assigned to a state position using `i % 32`.
-3. The input byte is XORed with the selected state byte.
-4. The resulting state byte is multiplied by a fixed constant.
-5. After all input bytes are processed, the state goes through the mixing function.
-6. The mixing function is applied **three times**. Each state byte is combined with neighboring state bytes using XOR and multiplication. (Updated in v0.1.1)
-7. The final 32-byte state is converted to a 64-character lowercase hexadecimal string.
-
-The algorithm always produces the same hash for the same input.
+1. **Init:** the state starts from 8 fixed constants.
+2. **Absorb:** each input byte is XORed into word `i % 8`, multiplied by an odd constant, rotated, and added into the next word.
+3. **Length:** the input length is mixed into the state.
+4. **Mix:** 16 rounds of add, rotate, XOR, multiply and shift on every word.
+5. **Output:** the 8 words are written as 64 lowercase hex characters.
+   The same input always gives the same hash.
 
 ```text
-function HASH(input: byte[]) -> string
-    state <- byte[32]
+MUL <- 0x9E3779B1          (odd constant)
  
-    seed <- 293847597
-    for i in 0..31:
-        seed  <- seed * 28 + i          
-        state[i] <- low 8 bits of seed
+function HASH(input: byte[]) -> string
+    state <- copy of INIT  (8 words of 32 bits)
  
     for i in 0..len(input)-1:
-        k <- i mod 32
+        k <- i mod 8
         state[k] <- state[k] XOR input[i]
-        state[k] <- (state[k] * 51) mod 256
+        state[k] <- rotateLeft(state[k] * MUL, 13)
+        state[(k+1) mod 8] <- state[(k+1) mod 8] + state[k]
  
-    repeat 3 times:
-        for i in 0..31:
-            state[i] <- state[i] XOR state[(i+1) mod 32]
-            state[i] <- state[i] XOR state[(i-1) mod 32]
-            state[i] <- (state[i] * 51) mod 256
+    state[0] <- state[0] XOR len(input)
+    state[1] <- state[1] + len(input) * MUL
  
-    return lowercase hex of state, 2 digits per byte
+    repeat 16 times:
+        for i in 0..7:
+            a <- state[i]
+            a <- a + (rotateLeft(state[(i+1) mod 8], 7) XOR state[(i+5) mod 8])
+            a <- a * MUL
+            a <- a XOR (a >>> 15)
+            state[i] <- a
+ 
+    return lowercase hex of state, 8 digits per word
 ```
 
 ## Input
@@ -50,14 +50,12 @@ function HASH(input: byte[]) -> string
 * No trimming or other normalization is performed.
 * The file name itself is not hashed; only the file contents are used.
 * An empty file is also a valid input and produces a 64-character hash.
-
-For manual input, the entered line is read as text, so the Enter key's line separator is not included in the hashed text. For files, any newline bytes physically present in the file are included in the hash.
+  For manual input, the entered line is read as text, so the Enter key's line separator is not included in the hashed text. For files, any newline bytes physically present in the file are included in the hash.
 
 ## Prerequisites
 
 * Java (JDK, includes `javac`) installed
 * Git, to clone this repository
-
 ## Setup
 
 Clone the repository:
@@ -89,7 +87,7 @@ java Main
 
 ## Testing
 
-The hash function was tested using several experiments.
+The v0.2 hash function was tested using the same experiments as v0.1.1.
 
 ### 1. Hash format
 
@@ -105,6 +103,7 @@ The output was checked for:
 All tested inputs produced a valid 64-character hexadecimal hash.
 
 (All files for this experiment are from experiment 1)
+
 ### 2. Determinism
 
 The same input (from experiment 1) was hashed multiple times and the results were compared.
@@ -118,9 +117,9 @@ A → B → A
 The first and second hashes of `A` were identical, showing that previous hash calculations do not affect later calculations.
 
 ```text
-A1: feb5b983e107edcda007fcda8e7703d761633fb5b507799dfad3ba684d8b1360
-B : e9eeab6c50c1015deef728577b37c896c38d3a50028cbfcde3908bb1709df8d3
-A2: feb5b983e107edcda007fcda8e7703d761633fb5b507799dfad3ba684d8b1360
+A1: 89ee5e0c45674c4600b9fda7ab02a9f039a61cbbb9e143e4d88be6e9a3de9cca
+B : d9f9ea3388d954bac2034eaba30b645c8852031e1285fae07831aea167dc944a
+A2: 89ee5e0c45674c4600b9fda7ab02a9f039a61cbbb9e143e4d88be6e9a3de9cca
 ```
 
 ### 3. Efficiency
@@ -131,24 +130,23 @@ The results were:
 
 | Lines | Bytes | Average (ns) | Minimum (ns) | Maximum (ns) |
 | ----: | ----: | -----------: | -----------: | -----------: |
-|     1 |    71 |       7869.7 |       2785.0 |      15141.1 |
-|     2 |   125 |       7470.8 |       5623.2 |       8832.2 |
-|     4 |   209 |       4745.3 |       4328.8 |       5330.3 |
-|     8 |   370 |       4019.7 |       3279.3 |       5194.6 |
-|    16 |  1012 |       5451.7 |       2980.6 |       7811.1 |
-|    32 |  1873 |       3445.3 |       3229.6 |       3642.9 |
-|    64 |  3776 |       5746.4 |       5019.4 |       6577.0 |
-|   128 |  9283 |       7669.5 |       7597.9 |       7772.4 |
-|   256 | 20665 |      14303.0 |      14059.2 |      14633.8 |
-|   512 | 47946 |      30403.5 |      29655.3 |      31583.3 |
-|   789 | 76384 |      47820.8 |      46387.7 |      49407.2 |
+|     1 |    71 |       5264.6 |       3982.6 |       7253.1 |
+|     2 |   125 |       6494.8 |       4784.6 |       9551.6 |
+|     4 |   209 |       3209.8 |       1925.6 |       4517.5 |
+|     8 |   370 |       2735.1 |       2629.4 |       2910.2 |
+|    16 |  1012 |       7214.1 |       4028.2 |      10424.9 |
+|    32 |  1873 |       5356.7 |       5288.8 |       5416.2 |
+|    64 |  3776 |       9875.0 |       9646.1 |      10103.1 |
+|   128 |  9283 |      23097.7 |      22743.0 |      23747.4 |
+|   256 | 20665 |      50707.7 |      49039.8 |      53876.4 |
+|   512 | 47946 |     116280.3 |     112306.9 |     120792.3 |
+|   789 | 76384 |     180467.6 |     178862.5 |     182493.3 |
 
+Graph v0.2 :
 
-Graph:
+![Graph](./images/efficiency_graphV0.2.png)
 
-![Graph](./images/4efficiency_graph.png)
-
-The execution time generally increased with input size, although small inputs showed normal timing fluctuations.
+It shows that V0.2 hash is slower, but it was expected because the final mixing does more work.
 
 ### 4. Collision testing
 
@@ -158,8 +156,7 @@ Random ASCII inputs were tested with lengths of:
 * 100 characters;
 * 500 characters;
 * 1000 characters.
-
-For each length, **100,000 pairs** of random inputs were tested.
+  For each length, **100,000 pairs** of random inputs were tested.
 
 The results were:
 
@@ -187,35 +184,31 @@ These results only describe the tested inputs and do not prove that the hash fun
 
 The avalanche test generated random ASCII strings and changed exactly one character in each pair.
 
-For each pair, both bit-level and hexadecimal-character differences were measured.
+For each pair, both bit-level and hexadecimal-character differences were measured. For an ideal hash function, about **50%** of the bits and about **93.75%** of the hexadecimal characters are expected to differ.
 
-With the mixing function applied three times, the results were:
+With 16 mixing rounds, the results were:
 
 | Input length | Min bit % | Max bit % | Average bit % | Min hex % | Max hex % | Average hex % |
 | -----------: | --------: | --------: | ------------: | --------: | --------: | ------------: |
-|           10 |       0.4 |      73.0 |         33.64 |       1.6 |     100.0 |         72.68 |
-|          100 |       0.4 |      67.2 |         36.13 |       1.6 |     100.0 |         76.89 |
-|          500 |       0.4 |      68.4 |         36.18 |       1.6 |     100.0 |         76.97 |
-|         1000 |       0.4 |      67.2 |         36.28 |       1.6 |     100.0 |         77.18 |
-|      **All** |   **0.4** |  **73.0** |     **35.56** |   **1.6** | **100.0** |     **75.93** |
+|           10 |      38.3 |      61.3 |         49.99 |      78.1 |     100.0 |         93.76 |
+|          100 |      36.3 |      62.1 |         50.02 |      79.7 |     100.0 |         93.76 |
+|          500 |      35.9 |      62.9 |         50.02 |      73.4 |     100.0 |         93.77 |
+|         1000 |      38.3 |      61.7 |         50.00 |      79.7 |     100.0 |         93.74 |
+|      **All** |  **35.9** |  **62.9** |     **50.00** |  **73.4** | **100.0** |     **93.76** |
 
-The additional mixing improved the avalanche results compared with the previous version of the algorithm.
+The average bit difference is 50.00% and the average hexadecimal-character difference is 93.76%, essentially the ideal values.
 
-The average bit difference increased from:
+Comparison with v0.1.1 (average difference, same test):
 
-```text
-1× mixing: 28.11%
-3× mixing: 35.56%
-```
+| Input length | v0.1.1 bit % | v0.2 bit % | v0.1.1 hex % | v0.2 hex % |
+| -----------: | -----------: | ---------: | -----------: | ---------: |
+|           10 |        33.64 |      49.99 |        72.68 |      93.76 |
+|          100 |        36.13 |      50.02 |        76.89 |      93.76 |
+|          500 |        36.18 |      50.02 |        76.97 |      93.77 |
+|         1000 |        36.28 |      50.00 |        77.18 |      93.74 |
+|      **All** |    **35.56** |  **50.00** |    **75.93** |  **93.76** |
 
-The average hexadecimal-character difference increased from:
-
-```text
-1× mixing: 57.37%
-3× mixing: 75.93%
-```
-
-The average bit difference is still below 50%, so the algorithm does not produce an ideal avalanche effect. However, applying the mixing function multiple times increased the observed diffusion in these tests.
+The worst single pair also improved: minimum bit difference 0.4% in v0.1.1 and 35.9% in v0.2.
 
 ### 6. Salt experiment
 
@@ -253,10 +246,11 @@ The timing results were:
 
 | | Without salt | With salt (`PzUA7uZwY3ux`) |
 | --- | ---: | ---: |
+| Target hash | `642f3983447f9ffe547bccc01d96768e2f76ae40dd0ea23b15ebc2cc3404c33c` | `84af8c31f14929e004f56c31c2970ac108520556ffbd463be9f2663604d58ef9` |
 | Attempts until first match | 5294 | 5294 |
 | Total attempts | 10000 | 10000 |
-| Time until first match | 30.1 ms | 15.9 ms |
-| Total time | 47.2 ms | 27.5 ms |
+| Time until first match | 15.7 ms | 11.5 ms |
+| Total time | 29.6 ms | 18.6 ms |
 | Matching candidates | `[5293]` | `[5293]` |
 
 The timing difference is dependent on the execution environment and is not used as a security measurement.
@@ -267,7 +261,16 @@ For H(input || r), if r is initially unknown, the search space becomes larger be
 
 ## Comparison
 
-v0.2 will be evaluated with the same inputs, seed (`283`), alphabet, sample sizes and environment as above, and compared with v0.1.1.
+v0.2 was evaluated with the same inputs, seed (`283`), alphabet, sample sizes and environment as v0.1.1.
 
-
-
+| Test | v0.1.1 (original) | v0.2 (AI version) |
+| --- | --- | --- |
+| Hash format (64 hex characters) | passed | passed |
+| Determinism (A → B → A) | passed | passed |
+| Collisions (4 × 100,000 pairs) | 0 | 0 |
+| Collisions (9 structured inputs) | 0 | 0 |
+| Average bit difference (avalanche) | 35.56% | 50.00% |
+| Average hex difference (avalanche) | 75.93% | 93.76% |
+| Minimum bit difference (avalanche) | 0.4% | 35.9% |
+| Time for 76,384 bytes (average) | 47,820.8 ns | 180,467.6 ns |
+| Brute-force of `5293` (attempts) | 5294 | 5294 |
